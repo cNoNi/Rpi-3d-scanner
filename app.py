@@ -13,9 +13,7 @@ from controlers.scanner import Scanner
 app = Flask(__name__)
 
 clients = []
-# -------------------------
-# Hardware initialization
-# -------------------------
+
 
 camera = Camera(
     image_dir=config.IMAGE_DIRECTORY
@@ -29,6 +27,7 @@ motor = StepperMotor(
     steps_per_revolution=config.MOTOR_STEPS_PER_REVOLUTION,
     step_delay=config.MOTOR_STEP_DELAY
 )
+
 
 def broadcast(status):
     dead = []
@@ -52,19 +51,13 @@ scanner = Scanner(
     on_status_change=broadcast
 )
 
-# -------------------------
-# Web interface
-# -------------------------
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
 
-
-# -------------------------
-# Scanner control
-# -------------------------
 
 @app.route("/scan/start", methods=["POST"])
 def start_scan():
@@ -109,10 +102,6 @@ def scan_status():
 
 
 
-# -------------------------
-# Camera control
-# -------------------------
-
 @app.route("/camera/photo", methods=["POST"])
 def take_photo():
 
@@ -124,28 +113,13 @@ def take_photo():
 
 
 
-# -------------------------
-# Manual motor control
-# -------------------------
-
-# @app.route("/motor/cw", methods=["POST"])
-# def motor_cw():
-
-#     motor.rotate_steps(
-#         100,
-#         clockwise=True
-#     )
-
-#     return jsonify({
-#         "status": "CW moved"
-#     })
-
-
 @app.route("/events")
 def events():
 
     q = Queue()
     clients.append(q)
+
+    q.put(scanner.status())
 
     def stream():
         try:
@@ -153,11 +127,17 @@ def events():
                 data = q.get()
                 yield f"data: {json.dumps(data)}\n\n"
         finally:
-            clients.remove(q)
+            if q in clients:
+                clients.remove(q)
 
     return Response(
         stream(),
-        mimetype="text/event-stream"
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 if __name__ == "__main__":

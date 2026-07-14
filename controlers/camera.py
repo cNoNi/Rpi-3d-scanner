@@ -10,9 +10,10 @@ class CameraError(Exception):
 
 class Camera:
 
-    def __init__(self, image_dir="images"):
+    def __init__(self, image_dir="photos"):
         self.image_dir = Path(image_dir)
         self.image_dir.mkdir(parents=True, exist_ok=True)
+        self.clear_images(image_dir)
 
     def detect(self):
         """Sprawdza, czy aparat jest podłączony."""
@@ -69,3 +70,10 @@ class Camera:
             raise CameraError(result.stderr.strip())
 
         return result.stdout
+    
+
+    def clear_images(folder):
+        folder = Path(folder)
+
+        for file in folder.glob("*.jpg"):
+            file.unlink()
