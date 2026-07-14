@@ -1,6 +1,8 @@
 import config
 
-from flask import Flask, jsonify, render_template
+from queue import Queue
+import json
+from flask import Flask, jsonify, render_template, Response
 from threading import Thread
 
 from controlers.camera import Camera
@@ -10,7 +12,7 @@ from controlers.scanner import Scanner
 
 app = Flask(__name__)
 
-
+clients = []
 # -------------------------
 # Hardware initialization
 # -------------------------
@@ -140,6 +142,25 @@ def motor_ccw():
         "status": "CCW moved"
     })
 
+
+@app.route("/events")
+def events():
+
+    q = Queue()
+    clients.append(q)
+
+    def stream():
+        try:
+            while True:
+                data = q.get()
+                yield f"data: {json.dumps(data)}\n\n"
+        finally:
+            clients.remove(q)
+
+    return Response(
+        stream(),
+        mimetype="text/event-stream"
+    )
 
 
 # -------------------------

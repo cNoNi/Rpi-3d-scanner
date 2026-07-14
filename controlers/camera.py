@@ -56,18 +56,6 @@ class Camera:
 
         return filepath
 
-    # def delete_all(self):
-    #     """Usuwa zdjęcia z pamięci aparatu."""
-
-    #     result = subprocess.run(
-    #         ["gphoto2", "--delete-all-files"],
-    #         capture_output=True,
-    #         text=True
-    #     )
-
-    #     if result.returncode != 0:
-    #         raise CameraError(result.stderr.strip())
-
     def summary(self):
         """Zwraca informacje o aparacie."""
 
