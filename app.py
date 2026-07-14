@@ -30,15 +30,27 @@ motor = StepperMotor(
     step_delay=config.MOTOR_STEP_DELAY
 )
 
+def broadcast(status):
+    dead = []
+
+    for client in clients:
+        try:
+            client.put_nowait(status)
+        except:
+            dead.append(client)
+
+    for client in dead:
+        clients.remove(client)
+
+
 scanner = Scanner(
     motor=motor,
     camera=camera,
     photos_per_revolution=config.PHOTOS_PER_REVOLUTION,
     pre_wait=config.PRE_CAPTURE_DELAY,
-    post_wait=config.POST_CAPTURE_DELAY
+    post_wait=config.POST_CAPTURE_DELAY,
+    on_status_change=broadcast
 )
-
-
 
 # -------------------------
 # Web interface
@@ -116,31 +128,17 @@ def take_photo():
 # Manual motor control
 # -------------------------
 
-@app.route("/motor/cw", methods=["POST"])
-def motor_cw():
+# @app.route("/motor/cw", methods=["POST"])
+# def motor_cw():
 
-    motor.rotate_steps(
-        100,
-        clockwise=True
-    )
+#     motor.rotate_steps(
+#         100,
+#         clockwise=True
+#     )
 
-    return jsonify({
-        "status": "CW moved"
-    })
-
-
-
-@app.route("/motor/ccw", methods=["POST"])
-def motor_ccw():
-
-    motor.rotate_steps(
-        100,
-        clockwise=False
-    )
-
-    return jsonify({
-        "status": "CCW moved"
-    })
+#     return jsonify({
+#         "status": "CW moved"
+#     })
 
 
 @app.route("/events")
@@ -161,11 +159,6 @@ def events():
         stream(),
         mimetype="text/event-stream"
     )
-
-
-# -------------------------
-# Start server
-# -------------------------
 
 if __name__ == "__main__":
 

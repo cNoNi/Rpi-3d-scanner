@@ -2,16 +2,6 @@ from time import sleep
 
 
 class Scanner:
-    """
-    Controls the scanning sequence.
-
-    Sequence:
-        1. Move turntable
-        2. Wait for vibrations to stop
-        3. Take photo
-        4. Wait for camera
-        5. Repeat
-    """
 
     def __init__(
         self,
@@ -19,7 +9,8 @@ class Scanner:
         camera,
         photos_per_revolution=100,
         pre_wait=2,
-        post_wait=2
+        post_wait=2,
+        on_status_change=None
     ):
 
         self.motor = motor
@@ -33,75 +24,61 @@ class Scanner:
         self.running = False
         self.current_photo = 0
 
+        self.on_status_change = on_status_change
+
+
+    def notify(self):
+        if self.on_status_change:
+            self.on_status_change(self.status())
+
 
     def start(self):
-        """
-        Start complete scan.
-        """
 
         if self.running:
             return
 
         self.running = True
         self.current_photo = 0
+        self.notify()
 
         total_steps = (
-            self.motor.steps_per_revolution
-            //
+            self.motor.steps_per_revolution //
             self.photos_per_revolution
         )
 
-
         try:
 
-            while self.running and (
+            while (
+                self.running and
                 self.current_photo < self.photos_per_revolution
             ):
 
-                # move platform
                 self.motor.rotate_steps(
                     total_steps,
                     clockwise=True
                 )
 
-
-                # allow object to settle
                 sleep(self.pre_wait)
 
-
-                # capture image
-                filename = (
-                    f"image_{self.current_photo:04d}.jpg"
-                )
-
+                filename = f"image_{self.current_photo:04d}.jpg"
                 self.camera.take_photo(filename)
 
-
-                # allow camera to finish
                 sleep(self.post_wait)
 
-
                 self.current_photo += 1
-
+                self.notify()
 
         finally:
             self.running = False
-
+            self.notify()
 
 
     def stop(self):
-        """
-        Stop scan after current operation.
-        """
-
         self.running = False
-
+        self.notify()
 
 
     def status(self):
-        """
-        Return current scan status.
-        """
 
         return {
             "running": self.running,
