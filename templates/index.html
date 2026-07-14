@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Scanner Control</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #f2f2f2;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        button {
+            width: 90%;
+            height: 50px;
+            margin: 8px;
+            font-size: 18px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+
+
+        .start {
+            background: green;
+            color: white;
+        }
+
+        .stop {
+            background: red;
+            color: white;
+        }
+
+        .control {
+            background: #ddd;
+        }
+
+
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+<h1>
+    3D Scanner
+</h1>
+
+
+<button class="start"
+onclick="startScan()">
+Start Scan
+</button>
+
+
+<button class="stop"
+onclick="stopScan()">
+Stop Scan
+</button>
+
+
+<hr>
+
+
+<button class="control"
+onclick="takePhoto()">
+Take Photo
+</button>
+
+
+<button class="control"
+onclick="moveCW()">
+Rotate CW
+</button>
+
+
+<button class="control"
+onclick="moveCCW()">
+Rotate CCW
+</button>
+
+
+
+<div id="status">
+Status: idle
+</div>
+
+
+</div>
+
+
+
+<script>
+
+
+function request(url, method="POST")
+{
+    fetch(url,{
+        method: method
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+    })
+    .catch(error=>{
+        console.log(error);
+    });
+}
+
+
+
+function startScan()
+{
+    request("/scan/start");
+}
+
+
+
+function stopScan()
+{
+    request("/scan/stop");
+}
+
+
+
+function takePhoto()
+{
+    request("/camera/photo");
+}
+
+
+
+function moveCW()
+{
+    request("/motor/cw");
+}
+
+
+
+function moveCCW()
+{
+    request("/motor/ccw");
+}
+
+
+
+function updateStatus()
+{
+
+    fetch("/scan/status")
+    .then(response => response.json())
+    .then(data => {
+
+
+        document.getElementById("status").innerHTML =
+        `
+        Running: ${data.running}<br>
+        Photo: ${data.photo}/${data.total}
+        `;
+
+
+    });
+
+}
+
+
+
+setInterval(updateStatus,1000);
+
+
+updateStatus();
+
+
+</script>
+
+
+</body>
+</html>
