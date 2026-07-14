@@ -72,7 +72,7 @@ class Camera:
         return result.stdout
     
 
-    def clear_images(folder):
+    def clear_images(self, folder):
         folder = Path(folder)
 
         for file in folder.glob("*.jpg"):
