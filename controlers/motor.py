@@ -21,8 +21,11 @@ class StepperMotor:
         step_pin=20,
         dir_pin=21,
         enable_pin=19,
-        steps_per_revolution=200*64,
-        step_delay=0.001
+        steps_per_revolution=200,
+        step_delay=0.001,
+        ms1_pin=22,
+        ms2_pin=23,
+        ms3_pin=24
     ):
 
         self.step_pin = OutputDevice(step_pin)
@@ -31,6 +34,14 @@ class StepperMotor:
 
         self.steps_per_revolution = steps_per_revolution
         self.step_delay = step_delay
+
+        self.ms1 = OutputDevice(ms1_pin)
+        self.ms2 = OutputDevice(ms2_pin)
+        self.ms3 = OutputDevice(ms3_pin)
+
+        self.ms1.on()
+        self.ms2.on()
+        self.ms3.on()
 
         # Start disabled
         self.disable()

@@ -6,19 +6,21 @@
 # Motor configuration
 # -------------------------
 
-MOTOR_STEP_PIN = 20
-MOTOR_DIR_PIN = 21
-MOTOR_ENABLE_PIN = 19
+MOTOR_STEP_PIN = 17
+MOTOR_DIR_PIN = 27
+MOTOR_ENABLE_PIN = 4
 
+MOTOR_MS1 = 22
+MOTOR_MS2 = 23
+MOTOR_MS3 = 24
 # 200 steps/revolution motor
 # multiplied by Big Easy Driver microstepping
 # Example: 200 * 64 = 12800
-MOTOR_STEPS_PER_REVOLUTION = 12800
+MOTOR_STEPS_PER_REVOLUTION = 3200
 
 # delay between GPIO pulses
 # lower = faster
 MOTOR_STEP_DELAY = 0.001
-
 
 
 # -------------------------

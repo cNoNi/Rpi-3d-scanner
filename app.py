@@ -25,7 +25,10 @@ motor = StepperMotor(
     dir_pin=config.MOTOR_DIR_PIN,
     enable_pin=config.MOTOR_ENABLE_PIN,
     steps_per_revolution=config.MOTOR_STEPS_PER_REVOLUTION,
-    step_delay=config.MOTOR_STEP_DELAY
+    step_delay=config.MOTOR_STEP_DELAY,
+    ms1_pin=config.MOTOR_MS1,
+    ms2_pin=config.MOTOR_MS2,
+    ms3_pin=config.MOTOR_MS3
 )
 
 
