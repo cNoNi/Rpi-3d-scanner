@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 from datetime import datetime
-
+import time
 
 class CameraError(Exception):
     """Wyjątek zgłaszany przy błędach aparatu."""
@@ -25,7 +25,7 @@ class Camera:
 
         return "usb:" in result.stdout.lower()
 
-    def take_photo(self, filename=None):
+    def take_photo(self, filename=None, retries=3):
         """
         Robi zdjęcie i zapisuje je na dysku.
 
@@ -46,16 +46,26 @@ class Camera:
             str(filepath)
         ]
 
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True
+        last_error = None
+
+        for attempt in range(retries):
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                return filepath
+
+            last_error = result.stderr.strip()
+            print(f"Photo attempt {attempt + 1}/{retries} failed: {last_error}")
+
+            time.sleep(1)  # wait before retry
+
+        raise CameraError(
+            f"Failed to take photo after {retries} attempts: {last_error}"
         )
-
-        if result.returncode != 0:
-            raise CameraError(result.stderr.strip())
-
-        return filepath
 
     def summary(self):
         """Zwraca informacje o aparacie."""
