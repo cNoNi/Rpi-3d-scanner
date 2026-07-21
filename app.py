@@ -9,6 +9,8 @@ from controlers.camera import Camera
 from controlers.motor import StepperMotor
 from controlers.scanner import Scanner
 
+from tmc_driver import Tmc2209, TmcEnableControlPin,TmcMotionControlStepDir
+from tmc_driver.com import TmcComUart
 
 app = Flask(__name__)
 
@@ -20,6 +22,10 @@ camera = Camera(
 )
 
 
+tmc = Tmc2209(TmcEnableControlPin(21), TmcMotionControlStepDir(16,20),TmcComUart("dev/serial0"))
+
+
+'''
 motor = StepperMotor(
     step_pin=config.MOTOR_STEP_PIN,
     dir_pin=config.MOTOR_DIR_PIN,
@@ -30,7 +36,7 @@ motor = StepperMotor(
     ms2_pin=config.MOTOR_MS2,
     ms3_pin=config.MOTOR_MS3
 )
-
+'''
 
 def broadcast(status):
     dead = []
@@ -46,7 +52,7 @@ def broadcast(status):
 
 
 scanner = Scanner(
-    motor=motor,
+    motor=tmc,
     camera=camera,
     photos_per_revolution=config.PHOTOS_PER_REVOLUTION,
     pre_wait=config.PRE_CAPTURE_DELAY,

@@ -1,2 +1,6 @@
 .vscode/
 photos/
+.venv/
+__pycache__/
+
+*.sh
