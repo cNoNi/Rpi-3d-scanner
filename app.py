@@ -6,10 +6,9 @@ from flask import Flask, jsonify, render_template, Response
 from threading import Thread
 
 from controlers.camera import Camera
-from controlers.motor import StepperMotor
 from controlers.scanner import Scanner
 
-from tmc_driver import Tmc2209, TmcEnableControlPin,TmcMotionControlStepDir
+from tmc_driver import Tmc2209, TmcEnableControlPin,TmcMotionControlStepDir, Board, tmc_gpio
 from tmc_driver.com import TmcComUart
 
 app = Flask(__name__)
@@ -21,22 +20,17 @@ camera = Camera(
     image_dir=config.IMAGE_DIRECTORY
 )
 
+UART_PORT = {
+    Board.RASPBERRY_PI: "/dev/serial0",
+    Board.RASPBERRY_PI5: "/dev/ttyAMA0",
+    Board.NVIDIA_JETSON: "/dev/ttyTHS1",
+}
 
-tmc = Tmc2209(TmcEnableControlPin(21), TmcMotionControlStepDir(16,20),TmcComUart("dev/serial0"))
-
-
-'''
-motor = StepperMotor(
-    step_pin=config.MOTOR_STEP_PIN,
-    dir_pin=config.MOTOR_DIR_PIN,
-    enable_pin=config.MOTOR_ENABLE_PIN,
-    steps_per_revolution=config.MOTOR_STEPS_PER_REVOLUTION,
-    step_delay=config.MOTOR_STEP_DELAY,
-    ms1_pin=config.MOTOR_MS1,
-    ms2_pin=config.MOTOR_MS2,
-    ms3_pin=config.MOTOR_MS3
+tmc = Tmc2209(
+    TmcEnableControlPin(config.MOTOR_ENABLE_PIN), 
+    TmcMotionControlStepDir(config.MOTOR_STEP_PIN,config.MOTOR_DIR_PIN),
+    TmcComUart(UART_PORT.get(tmc_gpio.BOARD, "/dev/serial0"))
 )
-'''
 
 def broadcast(status):
     dead = []

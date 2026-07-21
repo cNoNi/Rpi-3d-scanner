@@ -6,17 +6,14 @@
 # Motor configuration
 # -------------------------
 
-MOTOR_STEP_PIN = 17
-MOTOR_DIR_PIN = 27
-MOTOR_ENABLE_PIN = 4
+MOTOR_STEP_PIN = 16
+MOTOR_DIR_PIN = 20
+MOTOR_ENABLE_PIN = 21
 
-MOTOR_MS1 = 22
-MOTOR_MS2 = 23
-MOTOR_MS3 = 24
-# 200 steps/revolution motor
-# multiplied by Big Easy Driver microstepping
-# Example: 200 * 64 = 12800
-MOTOR_STEPS_PER_REVOLUTION = 3200
+# 200 steps/revolution motor(1.8 degree per step)
+MOTOR_STEPS_PER_REVOLUTION = 200
+# Microstepping resolution e.i. MOTOR_STEPS_PER_REVOLUTION * MOTOR_RESOLUTION = number of microsteps for full revolution 
+MOTOR_RESOLUTION = 1
 
 # delay between GPIO pulses
 # lower = faster
@@ -37,14 +34,11 @@ PRE_CAPTURE_DELAY = 2
 # before next movement
 POST_CAPTURE_DELAY = 2
 
-
-
 # -------------------------
 # Camera configuration
 # -------------------------
 
 IMAGE_DIRECTORY = "photos"
-
 
 # -------------------------
 # Web server
