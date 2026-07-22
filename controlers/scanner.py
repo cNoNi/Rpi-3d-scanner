@@ -58,6 +58,7 @@ class Scanner:
         self.running = True
         self.current_photo = 0
         self.notify()
+        self.motor_setup()
 
         step_per_photo = (
             self.microsteps_per_revolution /
