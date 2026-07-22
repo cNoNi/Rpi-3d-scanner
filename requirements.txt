@@ -1,4 +1,3 @@
 flask
 gpiozero
-PyTmcStepper
-websocket
+websockets

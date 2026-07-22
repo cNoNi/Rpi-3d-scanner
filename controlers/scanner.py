@@ -76,7 +76,7 @@ class Scanner:
 					break
 
 				target = round((photo + 1) * step_per_photo)
-			self.motor.run_to_position_steps(target)
+				self.motor.run_to_position_steps(target)
 
 		finally:
 			self.running = False

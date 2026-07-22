@@ -10,11 +10,10 @@ from threading import Thread
 from controlers.camera import Camera
 from controlers.scanner import Scanner
 
-from tmc_driver import Tmc2209, TmcEnableControlPin,TmcMotionControlStepDir, Board, tmc_gpio
-from tmc_driver.com import TmcComUart
-
 import asyncio
 import websockets
+
+from controlers.motor import Motor
 
 app = Flask(__name__)
 
@@ -27,19 +26,11 @@ camera = Camera(
     image_dir=config.IMAGE_DIRECTORY
 )
 
-UART_PORT = {
-    Board.RASPBERRY_PI: "/dev/serial0",
-    Board.RASPBERRY_PI5: "/dev/ttyAMA0",
-    Board.NVIDIA_JETSON: "/dev/ttyTHS1",
-}
 
-# Ensuers tmc2209 is enabled
-OutputDevice(config.MOTOR_ENABLE_PIN).off()
-
-tmc = Tmc2209(
-    TmcEnableControlPin(config.MOTOR_ENABLE_PIN), 
-    TmcMotionControlStepDir(config.MOTOR_STEP_PIN,config.MOTOR_DIR_PIN),
-    TmcComUart(UART_PORT.get(tmc_gpio.BOARD, "/dev/serial0"))
+motor = Motor(
+    en_pin=config.MOTOR_ENABLE_PIN,
+    step_pin=config.MOTOR_STEP_PIN,
+    dir_pin=config.MOTOR_DIR_PIN
 )
 
 def broadcast(status):
@@ -56,7 +47,7 @@ def broadcast(status):
 
 
 scanner = Scanner(
-    motor=tmc,
+    motor=motor,
     camera=camera,
     photos_per_revolution=config.PHOTOS_PER_REVOLUTION,
     pre_wait=config.PRE_CAPTURE_DELAY,
