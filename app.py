@@ -1,18 +1,27 @@
-import asyncio
+import config
+
 import json
+import asyncio
+
 from queue import Queue
 from threading import Thread
 
-import websockets
-from flask import Flask, jsonify, render_template, Response
+from flask import (
+    Flask,
+    jsonify,
+    render_template,
+    Response
+)
 
-import config
+import websockets
 
 from controlers.camera import Camera
 from controlers.motor import Motor
 from controlers.scanner import Scanner
 
+
 app = Flask(__name__)
+
 
 clients = []
 
@@ -20,9 +29,12 @@ phone = None
 ws_loop = None
 
 
+
 camera = Camera(
     image_dir=config.IMAGE_DIRECTORY
 )
+
+
 
 motor = Motor(
     en_pin=config.MOTOR_ENABLE_PIN,
@@ -31,177 +43,313 @@ motor = Motor(
 )
 
 
+
 def broadcast(status):
+
     dead = []
 
     for client in clients:
+
         try:
             client.put_nowait(status)
-        except Exception:
+
+        except:
             dead.append(client)
 
+
     for client in dead:
+
         if client in clients:
             clients.remove(client)
 
 
-async def _send_take_photo(filename):
+
+async def _send_take_photo():
+
     if phone is not None:
-        await phone.send(json.dumps({
-            "cmd": "take_photo",
-            "filename": filename
-        }))
+        await phone.send(
+            "take_photo"
+        )
 
 
-def request_phone_photo(filename):
+
+def scanner_take_photo(filename):
+
     if phone is None:
-        raise RuntimeError("Telefon nie jest połączony.")
+        print("Telefon nie podłączony")
+        return
 
-    future = asyncio.run_coroutine_threadsafe(
-        _send_take_photo(filename),
+
+    asyncio.run_coroutine_threadsafe(
+        _send_take_photo(),
         ws_loop
     )
 
-    future.result()
 
 
 scanner = Scanner(
+
     motor=motor,
+
     camera=camera,
-    photos_per_revolution=config.PHOTOS_PER_REVOLUTION,
-    pre_wait=config.PRE_CAPTURE_DELAY,
-    post_wait=config.POST_CAPTURE_DELAY,
-    on_status_change=broadcast,
-    take_photo_callback=request_phone_photo
+
+    photos_per_revolution=
+        config.PHOTOS_PER_REVOLUTION,
+
+    pre_wait=
+        config.PRE_CAPTURE_DELAY,
+
+    post_wait=
+        config.POST_CAPTURE_DELAY,
+
+    on_status_change=
+        broadcast,
+
+    take_photo_callback=
+        scanner_take_photo
 )
+
 
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+
+    return render_template(
+        "index.html"
+    )
 
 
-@app.route("/scan/start", methods=["POST"])
+
+@app.route(
+    "/scan/start",
+    methods=["POST"]
+)
 def start_scan():
 
     if scanner.running:
+
         return jsonify({
-            "status": "already_running"
+            "status":
+            "already running"
         })
 
-    thread = Thread(target=scanner.start, daemon=True)
-    thread.start()
+
+    Thread(
+        target=scanner.start,
+        daemon=True
+    ).start()
+
 
     return jsonify({
-        "status": "started"
+        "status":
+        "started"
     })
 
 
-@app.route("/scan/stop", methods=["POST"])
+
+@app.route(
+    "/scan/stop",
+    methods=["POST"]
+)
 def stop_scan():
 
     scanner.stop()
 
     return jsonify({
-        "status": "stopping"
+        "status":
+        "stopping"
     })
 
 
-@app.route("/scan/status")
+
+@app.route(
+    "/scan/status"
+)
 def scan_status():
-    return jsonify(scanner.status())
+
+    return jsonify(
+        scanner.status()
+    )
 
 
-@app.route("/camera/photo", methods=["POST"])
-def camera_photo():
+
+@app.route(
+    "/camera/photo",
+    methods=["POST"]
+)
+def take_photo():
+
 
     if phone is None:
-        return jsonify({
-            "status": "phone_not_connected"
-        }), 400
 
-    future = asyncio.run_coroutine_threadsafe(
-        _send_take_photo("manual"),
+        return jsonify({
+            "status":
+            "phone_not_connected"
+        }),400
+
+
+
+    asyncio.run_coroutine_threadsafe(
+        _send_take_photo(),
         ws_loop
     )
 
-    future.result()
 
     return jsonify({
-        "status": "photo_requested"
+        "status":
+        "photo_requested"
     })
+
 
 
 @app.route("/events")
 def events():
 
     q = Queue()
+
     clients.append(q)
 
-    q.put(scanner.status())
+
+    q.put(
+        scanner.status()
+    )
+
 
     def stream():
+
         try:
+
             while True:
+
                 data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+
+                yield (
+                    f"data: "
+                    f"{json.dumps(data)}\n\n"
+                )
+
+
         finally:
+
             if q in clients:
                 clients.remove(q)
 
+
+
     return Response(
+
         stream(),
-        mimetype="text/event-stream",
+
+        mimetype=
+        "text/event-stream",
+
         headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+
+            "Cache-Control":
+            "no-cache",
+
+            "Connection":
+            "keep-alive",
+
+            "X-Accel-Buffering":
+            "no"
+
         }
     )
 
 
+
 async def websocket_handler(websocket):
+
     global phone
 
     phone = websocket
-    print("Telefon połączony")
+
+    print(
+        "Telefon połączony"
+    )
+
 
     try:
+
         async for message in websocket:
-            print("Telefon:", message)
+
+            print(
+                "Telefon:",
+                message
+            )
+
+
     except websockets.ConnectionClosed:
-        print("Telefon rozłączony")
+
+        print(
+            "Telefon rozłączony"
+        )
+
+
     finally:
+
         phone = None
 
 
+
 def websocket_thread():
+
     global ws_loop
 
+
     async def main():
+
         global ws_loop
 
-        ws_loop = asyncio.get_running_loop()
+
+        ws_loop = (
+            asyncio
+            .get_running_loop()
+        )
+
 
         async with websockets.serve(
+
             websocket_handler,
+
             "0.0.0.0",
+
             8765
+
         ):
-            print("WebSocket działa na porcie 8765")
+
+            print(
+                "WebSocket działa na porcie 8765"
+            )
+
+
             await asyncio.Future()
 
-    asyncio.run(main())
+
+
+    asyncio.run(
+        main()
+    )
+
 
 
 if __name__ == "__main__":
+
+
     Thread(
         target=websocket_thread,
         daemon=True
     ).start()
 
+
+
     app.run(
+
         host="0.0.0.0",
+
         port=5000,
+
         debug=False
+
     )
