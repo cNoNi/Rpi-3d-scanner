@@ -1,5 +1,7 @@
 import config
 
+from gpiozero import OutputDevice
+
 from queue import Queue
 import json
 from flask import Flask, jsonify, render_template, Response
@@ -11,10 +13,15 @@ from controlers.scanner import Scanner
 from tmc_driver import Tmc2209, TmcEnableControlPin,TmcMotionControlStepDir, Board, tmc_gpio
 from tmc_driver.com import TmcComUart
 
+import asyncio
+import websockets
+
 app = Flask(__name__)
 
 clients = []
 
+phone = None
+ws_loop = None
 
 camera = Camera(
     image_dir=config.IMAGE_DIRECTORY
@@ -25,6 +32,9 @@ UART_PORT = {
     Board.RASPBERRY_PI5: "/dev/ttyAMA0",
     Board.NVIDIA_JETSON: "/dev/ttyTHS1",
 }
+
+# Ensuers tmc2209 is enabled
+OutputDevice(config.MOTOR_ENABLE_PIN).off()
 
 tmc = Tmc2209(
     TmcEnableControlPin(config.MOTOR_ENABLE_PIN), 
@@ -104,14 +114,26 @@ def scan_status():
     )
 
 
+async def _send_take_photo():
+    if phone is not None:
+        await phone.send("take_photo")
+
 
 @app.route("/camera/photo", methods=["POST"])
 def take_photo():
 
-    filename = camera.take_photo()
+    if phone is None:
+        return jsonify({
+            "status": "phone_not_connected"
+        }), 400
+
+    asyncio.run_coroutine_threadsafe(
+        _send_take_photo(),
+        ws_loop
+    )
 
     return jsonify({
-        "photo": str(filename)
+        "status": "photo_requested"
     })
 
 
@@ -143,8 +165,40 @@ def events():
         }
     )
 
-if __name__ == "__main__":
+async def websocket_handler(websocket):
+    global phone
 
+    phone = websocket
+    print("Telefon połączony")
+
+    try:
+        async for message in websocket:
+            print("Telefon:", message)
+    except websockets.ConnectionClosed:
+        print("Telefon rozłączony")
+    finally:
+        phone = None
+
+def websocket_thread():
+    global ws_loop
+
+    async def main():
+        global ws_loop
+        ws_loop = asyncio.get_running_loop()
+
+        async with websockets.serve(
+            websocket_handler,
+            "0.0.0.0",
+            8765
+        ):
+            print("WebSocket działa na porcie 8765")
+            await asyncio.Future()
+
+    asyncio.run(main())
+
+
+if __name__ == "__main__":
+    Thread(target=websocket_thread, daemon=True).start()
     app.run(
         host="0.0.0.0",
         port=5000,

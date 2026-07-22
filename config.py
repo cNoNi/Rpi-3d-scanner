@@ -8,7 +8,7 @@
 
 MOTOR_STEP_PIN = 16
 MOTOR_DIR_PIN = 20
-MOTOR_ENABLE_PIN = 21
+MOTOR_ENABLE_PIN = 26
 
 # 200 steps/revolution motor(1.8 degree per step)
 MOTOR_STEPS_PER_REVOLUTION = 200
