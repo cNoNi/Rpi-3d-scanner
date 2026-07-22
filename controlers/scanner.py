@@ -12,11 +12,15 @@ class Scanner:
 		post_wait=2,
 		on_status_change=None,
 		steps_per_revolution=200,
-		resolution=1
+		resolution=1,
+		take_photo_callback=None,
 	):
 
 		self.motor = motor
 		self.camera = camera
+
+		self.take_photo_callback = take_photo_callback
+
 
 		self.photos_per_revolution = photos_per_revolution
 		self.steps_per_revolution = steps_per_revolution
@@ -66,7 +70,10 @@ class Scanner:
 				filename = f"image_{photo:04d}.jpg"
 
 				sleep(self.pre_wait)
-				self.camera.take_photo(filename)
+				if self.take_photo_callback:
+					self.take_photo_callback(filename)
+				elif self.camera:
+					self.camera.take_photo(filename)
 				sleep(self.post_wait)
 
 				self.current_photo = photo + 1
