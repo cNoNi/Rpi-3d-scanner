@@ -1,89 +1,120 @@
-import subprocess
-from pathlib import Path
-from datetime import datetime
-import time
+import os
+import asyncio
 
-class CameraError(Exception):
-    """Wyjątek zgłaszany przy błędach aparatu."""
-    pass
+from threading import Event
 
 
 class Camera:
 
-    def __init__(self, image_dir="photos"):
-        self.image_dir = Path(image_dir)
-        self.image_dir.mkdir(parents=True, exist_ok=True)
-        self.clear_images(image_dir)
+    def __init__(
+        self,
+        image_dir
+    ):
 
-    def detect(self):
-        """Sprawdza, czy aparat jest podłączony."""
-        result = subprocess.run(
-            ["gphoto2", "--auto-detect"],
-            capture_output=True,
-            text=True
+        self.image_dir = image_dir
+
+        os.makedirs(
+            self.image_dir,
+            exist_ok=True
         )
 
-        return "usb:" in result.stdout.lower()
+        self.phone = None
+        self.loop = None
 
-    def take_photo(self, filename=None, retries=3):
-        """
-        Robi zdjęcie i zapisuje je na dysku.
+        self.photo_done = Event()
 
-        Zwraca:
-            Path do zapisanego pliku.
-        """
 
-        if filename is None:
-            filename = datetime.now().strftime("%Y%m%d_%H%M%S.jpg")
 
-        filepath = self.image_dir / filename
+    def set_connection(
+        self,
+        websocket,
+        loop
+    ):
 
-        command = [
-            "gphoto2",
-            "--capture-image-and-download",
-            "--force-overwrite",
-            "--filename",
-            str(filepath)
-        ]
+        self.phone = websocket
+        self.loop = loop
 
-        last_error = None
+        print(
+            "Camera: telefon podłączony"
+        )
 
-        for attempt in range(retries):
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True
+
+
+    def disconnect(self):
+
+        self.phone = None
+        self.loop = None
+
+        self.photo_done.clear()
+
+        print(
+            "Camera: telefon rozłączony"
+        )
+
+
+
+    async def _send_take_photo(self):
+
+        if self.phone:
+
+            await self.phone.send(
+                "take_photo"
             )
 
-            if result.returncode == 0:
-                return filepath
 
-            last_error = result.stderr.strip()
-            print(f"Photo attempt {attempt + 1}/{retries} failed: {last_error}")
 
-            time.sleep(1)  # wait before retry
+    def take_photo(
+        self,
+        filename
+    ):
 
-        raise CameraError(
-            f"Failed to take photo after {retries} attempts: {last_error}"
+        if self.phone is None:
+            raise RuntimeError(
+                "Telefon nie jest podłączony"
+            )
+
+
+        if self.loop is None:
+            raise RuntimeError(
+                "Brak websocket loop"
+            )
+
+
+        self.photo_done.clear()
+
+
+        asyncio.run_coroutine_threadsafe(
+            self._send_take_photo(),
+            self.loop
         )
 
-    def summary(self):
-        """Zwraca informacje o aparacie."""
 
-        result = subprocess.run(
-            ["gphoto2", "--summary"],
-            capture_output=True,
-            text=True
+        success = self.photo_done.wait(
+            timeout=10
         )
 
-        if result.returncode != 0:
-            raise CameraError(result.stderr.strip())
 
-        return result.stdout
-    
+        if not success:
+            raise TimeoutError(
+                "Telefon nie potwierdził zdjęcia"
+            )
 
-    def clear_images(self, folder):
-        folder = Path(folder)
 
-        for file in folder.glob("*.jpg"):
-            file.unlink()
+        filepath = os.path.join(
+            self.image_dir,
+            filename
+        )
+
+
+        print(
+            f"Zdjęcie wykonane: {filepath}"
+        )
+
+
+        return filepath
+
+
+
+    def photo_taken(self):
+
+        self.photo_done.set()

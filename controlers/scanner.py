@@ -9,11 +9,10 @@ class Scanner:
         camera=None,
         photos_per_revolution=100,
         pre_wait=2,
-        post_wait=2,
+        post_wait=0,
         on_status_change=None,
         steps_per_revolution=200,
         resolution=1,
-        take_photo_callback=None
     ):
 
         self.motor = motor
@@ -34,20 +33,30 @@ class Scanner:
         self.current_photo = 0
 
         self.on_status_change = on_status_change
-        self.take_photo_callback = take_photo_callback
+
 
 
     def notify(self):
+
         if self.on_status_change:
-            self.on_status_change(self.status())
+            self.on_status_change(
+                self.status()
+            )
+
 
 
     def motor_setup(self):
+
         self.motor.set_motor_enabled(True)
-        self.motor.run_to_position_steps(0)
+
+        self.motor.run_to_position_steps(
+            0
+        )
+
         self.motor.set_microstepping_resolution(
             self.resolution
         )
+
 
 
     def start(self):
@@ -55,15 +64,26 @@ class Scanner:
         if self.running:
             return
 
+
+        if self.camera is None:
+            raise RuntimeError(
+                "Brak kamery"
+            )
+
+
         self.running = True
         self.current_photo = 0
+
         self.notify()
+
         self.motor_setup()
+
 
         step_per_photo = (
             self.microsteps_per_revolution /
             self.photos_per_revolution
         )
+
 
         try:
 
@@ -71,27 +91,33 @@ class Scanner:
                 self.photos_per_revolution
             ):
 
+
                 if not self.running:
                     break
 
 
-                filename = f"image_{photo:04d}.jpg"
+                filename = (
+                    f"image_{photo:04d}.jpg"
+                )
 
 
-                sleep(self.pre_wait)
+                sleep(
+                    self.pre_wait
+                )
 
 
-                if self.take_photo_callback:
-                    self.take_photo_callback(filename)
-
-                elif self.camera:
-                    self.camera.take_photo(filename)
+                self.camera.take_photo(
+                    filename
+                )
 
 
-                sleep(self.post_wait)
+                sleep(
+                    self.post_wait
+                )
 
 
                 self.current_photo = photo + 1
+
                 self.notify()
 
 
@@ -103,6 +129,7 @@ class Scanner:
                     (photo + 1) * step_per_photo
                 )
 
+
                 self.motor.run_to_position_steps(
                     target
                 )
@@ -111,14 +138,23 @@ class Scanner:
         finally:
 
             self.running = False
+
+            self.motor.set_motor_enabled(
+                False
+            )
+
             self.notify()
 
 
 
     def stop(self):
 
-        self.motor.set_motor_enabled(False)
         self.running = False
+
+        self.motor.set_motor_enabled(
+            False
+        )
+
         self.notify()
 
 

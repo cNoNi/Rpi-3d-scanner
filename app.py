@@ -25,9 +25,7 @@ app = Flask(__name__)
 
 clients = []
 
-phone = None
 ws_loop = None
-
 
 
 camera = Camera(
@@ -35,13 +33,11 @@ camera = Camera(
 )
 
 
-
 motor = Motor(
     en_pin=config.MOTOR_ENABLE_PIN,
     step_pin=config.MOTOR_STEP_PIN,
     dir_pin=config.MOTOR_DIR_PIN
 )
-
 
 
 def broadcast(status):
@@ -64,29 +60,6 @@ def broadcast(status):
 
 
 
-async def _send_take_photo():
-
-    if phone is not None:
-        await phone.send(
-            "take_photo"
-        )
-
-
-
-def scanner_take_photo(filename):
-
-    if phone is None:
-        print("Telefon nie podłączony")
-        return
-
-
-    asyncio.run_coroutine_threadsafe(
-        _send_take_photo(),
-        ws_loop
-    )
-
-
-
 scanner = Scanner(
 
     motor=motor,
@@ -103,10 +76,7 @@ scanner = Scanner(
         config.POST_CAPTURE_DELAY,
 
     on_status_change=
-        broadcast,
-
-    take_photo_callback=
-        scanner_take_photo
+        broadcast
 )
 
 
@@ -179,26 +149,26 @@ def scan_status():
 )
 def take_photo():
 
+    try:
 
-    if phone is None:
+        camera.take_photo(
+            "manual.jpg"
+        )
 
         return jsonify({
             "status":
-            "phone_not_connected"
+            "photo_taken"
+        })
+
+
+    except Exception as e:
+
+        return jsonify({
+            "status":
+            "error",
+            "message":
+            str(e)
         }),400
-
-
-
-    asyncio.run_coroutine_threadsafe(
-        _send_take_photo(),
-        ws_loop
-    )
-
-
-    return jsonify({
-        "status":
-        "photo_requested"
-    })
 
 
 
@@ -208,7 +178,6 @@ def events():
     q = Queue()
 
     clients.append(q)
-
 
     q.put(
         scanner.status()
@@ -261,9 +230,10 @@ def events():
 
 async def websocket_handler(websocket):
 
-    global phone
-
-    phone = websocket
+    camera.set_connection(
+        websocket,
+        ws_loop
+    )
 
     print(
         "Telefon połączony"
@@ -280,6 +250,11 @@ async def websocket_handler(websocket):
             )
 
 
+            if message == "photo_taken":
+
+                camera.photo_taken()
+
+
     except websockets.ConnectionClosed:
 
         print(
@@ -289,7 +264,7 @@ async def websocket_handler(websocket):
 
     finally:
 
-        phone = None
+        camera.disconnect()
 
 
 
