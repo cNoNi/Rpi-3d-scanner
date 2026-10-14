@@ -76,7 +76,10 @@ scanner = Scanner(
         config.POST_CAPTURE_DELAY,
 
     on_status_change=
-        broadcast
+        broadcast,
+        
+    resolution=config.MOTOR_RESOLUTION
+    
 )
 
 

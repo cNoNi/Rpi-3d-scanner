@@ -13,7 +13,7 @@ MOTOR_ENABLE_PIN = 26
 # 200 steps/revolution motor(1.8 degree per step)
 MOTOR_STEPS_PER_REVOLUTION = 200
 # Microstepping resolution e.i. MOTOR_STEPS_PER_REVOLUTION * MOTOR_RESOLUTION = number of microsteps for full revolution 
-MOTOR_RESOLUTION = 1
+MOTOR_RESOLUTION = 8
 
 # delay between GPIO pulses
 # lower = faster
@@ -24,11 +24,11 @@ MOTOR_STEP_DELAY = 0.001
 # Scanner configuration
 # -------------------------
 
-PHOTOS_PER_REVOLUTION = 100
+PHOTOS_PER_REVOLUTION = 50
 
 # seconds to wait after moving
 # for turntable vibrations to stop
-PRE_CAPTURE_DELAY = 2
+PRE_CAPTURE_DELAY = 3
 
 # seconds to wait after photo
 # before next movement

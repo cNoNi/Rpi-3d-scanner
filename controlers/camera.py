@@ -40,17 +40,13 @@ class Camera:
 
 
 
-    def disconnect(self):
-
-        self.phone = None
-        self.loop = None
-
-        self.photo_done.clear()
-
-        print(
-            "Camera: telefon rozłączony"
-        )
-
+    def disconnect(self, websocket):
+        # rozłącz tylko, jeśli to aktualne połączenie
+        if self.phone is websocket:
+            self.phone = None
+            self.loop = None
+            self.photo_done.clear()
+            print("Camera: telefon rozłączony")
 
 
     async def _send_take_photo(self):
@@ -63,55 +59,24 @@ class Camera:
 
 
 
-    def take_photo(
-        self,
-        filename
-    ):
+    def take_photo(self, filename):
+        phone, loop = self.phone, self.loop
 
-        if self.phone is None:
-            raise RuntimeError(
-                "Telefon nie jest podłączony"
-            )
-
-
-        if self.loop is None:
-            raise RuntimeError(
-                "Brak websocket loop"
-            )
-
+        if phone is None or loop is None:
+            raise RuntimeError("Telefon nie jest podłączony")
 
         self.photo_done.clear()
 
-
-        asyncio.run_coroutine_threadsafe(
-            self._send_take_photo(),
-            self.loop
+        future = asyncio.run_coroutine_threadsafe(
+            phone.send("take_photo"),
+            loop,
         )
+        future.result(timeout=5)  # rzuci wyjątek, jeśli wysyłka się nie udała
 
+        if not self.photo_done.wait(timeout=10):
+            raise TimeoutError("Telefon nie potwierdził zdjęcia")
 
-        success = self.photo_done.wait(
-            timeout=10
-        )
-
-
-        if not success:
-            raise TimeoutError(
-                "Telefon nie potwierdził zdjęcia"
-            )
-
-
-        filepath = os.path.join(
-            self.image_dir,
-            filename
-        )
-
-
-        print(
-            f"Zdjęcie wykonane: {filepath}"
-        )
-
-
-        return filepath
+        return os.path.join(self.image_dir, filename)
 
 
 

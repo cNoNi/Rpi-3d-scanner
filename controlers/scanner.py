@@ -12,7 +12,7 @@ class Scanner:
         post_wait=0,
         on_status_change=None,
         steps_per_revolution=200,
-        resolution=1,
+        resolution=8,
     ):
 
         self.motor = motor
