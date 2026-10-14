@@ -1,3 +1,4 @@
+import threading
 from time import sleep
 
 
@@ -34,6 +35,9 @@ class Scanner:
 
         self.on_status_change = on_status_change
 
+        self._lock = threading.Lock()
+        self.error = None
+
 
 
     def notify(self):
@@ -60,109 +64,65 @@ class Scanner:
 
 
     def start(self):
-
-        if self.running:
-            return
-
-
         if self.camera is None:
-            raise RuntimeError(
-                "Brak kamery"
-            )
+            raise RuntimeError("Brak kamery")
 
+        if not self._lock.acquire(blocking=False):
+            return  # skan już trwa
 
         self.running = True
         self.current_photo = 0
-
+        self.error = None
         self.notify()
 
-        self.motor_setup()
-
-
-        step_per_photo = (
-            self.microsteps_per_revolution /
-            self.photos_per_revolution
-        )
-
-
         try:
+            self.motor_setup()
 
-            for photo in range(
+            step_per_photo = (
+                self.microsteps_per_revolution /
                 self.photos_per_revolution
-            ):
+            )
 
+            for photo in range(self.photos_per_revolution):
+                if not self.running:
+                    break
+
+                sleep(self.pre_wait)
 
                 if not self.running:
                     break
 
-
-                filename = (
-                    f"image_{photo:04d}.jpg"
-                )
-
-
-                sleep(
-                    self.pre_wait
-                )
-
-
-                self.camera.take_photo(
-                    filename
-                )
-
-
-                sleep(
-                    self.post_wait
-                )
-
+                self.camera.take_photo(f"image_{photo:04d}.jpg")
+                sleep(self.post_wait)
 
                 self.current_photo = photo + 1
-
                 self.notify()
-
 
                 if photo == self.photos_per_revolution - 1:
                     break
 
-
-                target = round(
-                    (photo + 1) * step_per_photo
-                )
-
-
                 self.motor.run_to_position_steps(
-                    target
+                    round((photo + 1) * step_per_photo)
                 )
 
-
+        except Exception as e:
+            self.error = str(e)
+            raise
         finally:
-
             self.running = False
-
-            self.motor.set_motor_enabled(
-                False
-            )
-
+            self.motor.set_motor_enabled(False)
             self.notify()
-
+            self._lock.release()
 
 
     def stop(self):
-
-        self.running = False
-
-        self.motor.set_motor_enabled(
-            False
-        )
-
-        self.notify()
-
+        self.running = False  # reszta posprząta w finally
 
 
     def status(self):
-
         return {
             "running": self.running,
             "photo": self.current_photo,
-            "total": self.photos_per_revolution
+            "total": self.photos_per_revolution,
+            "error": self.error,
         }

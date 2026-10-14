@@ -36,50 +36,34 @@ camera = Camera(
 motor = Motor(
     en_pin=config.MOTOR_ENABLE_PIN,
     step_pin=config.MOTOR_STEP_PIN,
-    dir_pin=config.MOTOR_DIR_PIN
+    dir_pin=config.MOTOR_DIR_PIN,
+    step_delay=config.MOTOR_STEP_DELAY,
 )
 
-
 def broadcast(status):
-
     dead = []
 
     for client in clients:
-
         try:
             client.put_nowait(status)
-
         except:
             dead.append(client)
 
-
     for client in dead:
-
         if client in clients:
             clients.remove(client)
 
 
 
 scanner = Scanner(
-
     motor=motor,
-
     camera=camera,
-
-    photos_per_revolution=
-        config.PHOTOS_PER_REVOLUTION,
-
-    pre_wait=
-        config.PRE_CAPTURE_DELAY,
-
-    post_wait=
-        config.POST_CAPTURE_DELAY,
-
-    on_status_change=
-        broadcast,
-        
-    resolution=config.MOTOR_RESOLUTION
-    
+    photos_per_revolution=config.PHOTOS_PER_REVOLUTION,
+    steps_per_revolution=config.MOTOR_STEPS_PER_REVOLUTION,
+    resolution=config.MOTOR_RESOLUTION,
+    pre_wait=config.PRE_CAPTURE_DELAY,
+    post_wait=config.POST_CAPTURE_DELAY,
+    on_status_change=broadcast,
 )
 
 
@@ -173,6 +157,24 @@ def take_photo():
             str(e)
         }),400
 
+
+JOG_STEPS = 10  # albo z configu
+
+def jog(direction):
+    if scanner.running:
+        return jsonify({"status": "busy"}), 409
+    motor.set_motor_enabled(True)
+    motor.run_to_position_steps(motor.position + direction * JOG_STEPS)
+    motor.set_motor_enabled(False)
+    return jsonify({"status": "ok"})
+
+@app.route("/motor/cw", methods=["POST"])
+def motor_cw():
+    return jog(1)
+
+@app.route("/motor/ccw", methods=["POST"])
+def motor_ccw():
+    return jog(-1)
 
 
 @app.route("/events")
