@@ -53,9 +53,7 @@ class Scanner:
 
         self.motor.set_motor_enabled(True)
 
-        self.motor.run_to_position_steps(
-            0
-        )
+        self.motor.run_to_position_steps(0)
 
         self.motor.set_microstepping_resolution(
             self.resolution
@@ -116,7 +114,7 @@ class Scanner:
 
 
     def stop(self):
-        self.running = False  # reszta posprząta w finally
+        self.running = False
 
 
     def status(self):

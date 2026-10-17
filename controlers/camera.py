@@ -6,11 +6,7 @@ from threading import Event
 
 class Camera:
 
-    def __init__(
-        self,
-        image_dir
-    ):
-
+    def __init__(self,image_dir):
         self.image_dir = image_dir
 
         os.makedirs(
@@ -23,22 +19,11 @@ class Camera:
 
         self.photo_done = Event()
 
-
-
-    def set_connection(
-        self,
-        websocket,
-        loop
-    ):
-
+    def set_connection(self,websocket,loop):
         self.phone = websocket
         self.loop = loop
 
-        print(
-            "Camera: telefon podłączony"
-        )
-
-
+        print("Camera: telefon podłączony")
 
     def disconnect(self, websocket):
         # rozłącz tylko, jeśli to aktualne połączenie
@@ -50,9 +35,7 @@ class Camera:
 
 
     async def _send_take_photo(self):
-
         if self.phone:
-
             await self.phone.send(
                 "take_photo"
             )

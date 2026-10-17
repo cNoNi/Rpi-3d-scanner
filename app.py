@@ -158,7 +158,7 @@ def take_photo():
         }),400
 
 
-JOG_STEPS = 10  # albo z configu
+JOG_STEPS = config.MOTOR_JOG | 10
 
 def jog(direction):
     if scanner.running:
@@ -184,31 +184,20 @@ def events():
 
     clients.append(q)
 
-    q.put(
-        scanner.status()
-    )
-
+    q.put(scanner.status())
 
     def stream():
-
         try:
-
             while True:
-
                 data = q.get()
-
                 yield (
                     f"data: "
                     f"{json.dumps(data)}\n\n"
                 )
 
-
         finally:
-
             if q in clients:
                 clients.remove(q)
-
-
 
     return Response(
 
@@ -290,18 +279,12 @@ def websocket_thread():
 
 
         async with websockets.serve(
-
             websocket_handler,
-
             "0.0.0.0",
-
             8765
-
         ):
 
-            print(
-                "WebSocket działa na porcie 8765"
-            )
+            print("WebSocket działa na porcie 8765")
 
 
             await asyncio.Future()
