@@ -2,5 +2,5 @@
 photos/
 .venv/
 __pycache__/
-
+.claude
 *.sh

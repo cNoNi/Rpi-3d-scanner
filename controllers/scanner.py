@@ -1,126 +1,158 @@
+"""Turntable scan: rotate, settle, take photo, repeat.
+
+The scanner owns the motor and the camera: scans, jogs and single photos all
+go through one lock, so they can never run at the same time.
+"""
+
+import logging
 import threading
-from time import sleep
+
+log = logging.getLogger(__name__)
 
 
 class Scanner:
-
     def __init__(
         self,
         motor,
-        camera=None,
-        photos_per_revolution=100,
-        pre_wait=2,
-        post_wait=0,
+        camera,
+        photos_per_revolution,
+        microsteps_per_revolution,
+        pre_capture_delay=2.0,
+        post_capture_delay=0.0,
         on_status_change=None,
-        steps_per_revolution=200,
-        resolution=8,
     ):
+        if photos_per_revolution <= 0:
+            raise ValueError("photos_per_revolution must be positive")
+        if microsteps_per_revolution < photos_per_revolution:
+            raise ValueError("more photos per revolution than microsteps per revolution")
+        if pre_capture_delay < 0 or post_capture_delay < 0:
+            raise ValueError("delays must not be negative")
 
         self.motor = motor
         self.camera = camera
-
         self.photos_per_revolution = photos_per_revolution
-        self.steps_per_revolution = steps_per_revolution
-        self.resolution = resolution
-
-        self.microsteps_per_revolution = (
-            steps_per_revolution * resolution
-        )
-
-        self.pre_wait = pre_wait
-        self.post_wait = post_wait
-
-        self.running = False
-        self.current_photo = 0
-
+        self.microsteps_per_revolution = microsteps_per_revolution
+        self.pre_capture_delay = pre_capture_delay
+        self.post_capture_delay = post_capture_delay
         self.on_status_change = on_status_change
 
-        self._lock = threading.Lock()
-        self.error = None
+        self._busy = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = None
 
+        self._scanning = False
+        self._current_photo = 0
+        self._error = None
 
+    # -- state ---------------------------------------------------------------
 
-    def notify(self):
+    @property
+    def busy(self):
+        return self._busy.locked()
 
-        if self.on_status_change:
-            self.on_status_change(
-                self.status()
-            )
-
-
-
-    def motor_setup(self):
-
-        self.motor.set_motor_enabled(True)
-
-        self.motor.run_to_position_steps(0)
-
-        self.motor.set_microstepping_resolution(
-            self.resolution
-        )
-
-
-
-    def start(self):
-        if self.camera is None:
-            raise RuntimeError("Brak kamery")
-
-        if not self._lock.acquire(blocking=False):
-            return  # skan już trwa
-
-        self.running = True
-        self.current_photo = 0
-        self.error = None
-        self.notify()
-
-        try:
-            self.motor_setup()
-
-            step_per_photo = (
-                self.microsteps_per_revolution /
-                self.photos_per_revolution
-            )
-
-            for photo in range(self.photos_per_revolution):
-                if not self.running:
-                    break
-
-                sleep(self.pre_wait)
-
-                if not self.running:
-                    break
-
-                self.camera.take_photo(f"image_{photo:04d}.jpg")
-                sleep(self.post_wait)
-
-                self.current_photo = photo + 1
-                self.notify()
-
-                if photo == self.photos_per_revolution - 1:
-                    break
-
-                self.motor.run_to_position_steps(
-                    round((photo + 1) * step_per_photo)
-                )
-
-        except Exception as e:
-            self.error = str(e)
-            raise
-        finally:
-            self.running = False
-            self.motor.set_motor_enabled(False)
-            self.notify()
-            self._lock.release()
-
-
-    def stop(self):
-        self.running = False
-
+    @property
+    def scanning(self):
+        return self._scanning
 
     def status(self):
         return {
-            "running": self.running,
-            "photo": self.current_photo,
+            "running": self._scanning,
+            "stopping": self._scanning and self._stop.is_set(),
+            "busy": self.busy,
+            "photo": self._current_photo,
             "total": self.photos_per_revolution,
-            "error": self.error,
+            "error": self._error,
         }
+
+    def _notify(self):
+        if self.on_status_change is not None:
+            try:
+                self.on_status_change()
+            except Exception:
+                log.exception("Status callback failed")
+
+    # -- scan ----------------------------------------------------------------
+
+    def start(self):
+        """Start a scan in the background. Returns False if something is already running."""
+        if not self._busy.acquire(blocking=False):
+            return False
+        try:
+            self._stop.clear()
+            self._scanning = True
+            self._current_photo = 0
+            self._error = None
+            self._thread = threading.Thread(target=self._run, name="scan", daemon=True)
+            self._thread.start()
+        except BaseException:
+            self._scanning = False
+            self._busy.release()
+            raise
+        self._notify()
+        return True
+
+    def stop(self):
+        if self._scanning:
+            self._stop.set()
+            self._notify()
+
+    def shutdown(self, timeout=5.0):
+        """Stop the scan (if any) and wait for it to finish."""
+        self._stop.set()
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout)
+
+    def _run(self):
+        try:
+            with self.motor.enabled():
+                origin = self.motor.position
+                for index in range(self.photos_per_revolution):
+                    if index > 0:
+                        target = origin + round(
+                            index * self.microsteps_per_revolution / self.photos_per_revolution
+                        )
+                        if not self.motor.move_to(target, should_stop=self._stop.is_set):
+                            break
+
+                    if self._stop.wait(self.pre_capture_delay):
+                        break
+
+                    self.camera.take_photo(f"image_{index:04d}.jpg")
+                    self._current_photo = index + 1
+                    self._notify()
+
+                    if self._stop.wait(self.post_capture_delay):
+                        break
+        except Exception as exc:
+            log.exception("Scan failed")
+            self._error = str(exc)
+        finally:
+            self._scanning = False
+            self._busy.release()
+            self._notify()
+
+    # -- manual control ------------------------------------------------------
+
+    def jog(self, steps):
+        """Rotate by ``steps`` microsteps. Returns False if the scanner is busy."""
+        if not self._busy.acquire(blocking=False):
+            return False
+        try:
+            with self.motor.enabled():
+                self.motor.move_by(steps)
+        finally:
+            self._busy.release()
+        return True
+
+    def take_single_photo(self):
+        """Take one photo. Returns False if the scanner is busy."""
+        if not self._busy.acquire(blocking=False):
+            return False
+        self._notify()
+        try:
+            self.camera.take_photo("manual.jpg")
+        finally:
+            self._busy.release()
+            self._notify()
+        return True

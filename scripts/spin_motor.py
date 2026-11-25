@@ -1,25 +1,32 @@
-from gpiozero import OutputDevice
-from time import sleep
+"""Hardware check: spin the motor continuously until Ctrl+C.
 
-# Numery pinów GPIO (BCM)
-STEP_PIN = 16    # przykładowo GPIO27
-DIR_PIN = 20     # przykładowo GPIO22
-EN_PIN = 26
+Run on the Raspberry Pi from the repository root:
+    python -m scripts.spin_motor
+"""
 
-step = OutputDevice(STEP_PIN)
-direction = OutputDevice(DIR_PIN)
-en = OutputDevice(EN_PIN)
-# Kierunek obrotu
-direction.on()
+import config
+from controllers.motor import StepperMotor
+
+STEPS_PER_SECOND = 400
 
 
-en.off()
-# 400 kroków/s
-steps_per_second = 400
-delay = 1 / (steps_per_second * 2)
+def main():
+    motor = StepperMotor(
+        step_pin=config.MOTOR_STEP_PIN,
+        dir_pin=config.MOTOR_DIR_PIN,
+        enable_pin=config.MOTOR_ENABLE_PIN,
+        step_delay=1 / (STEPS_PER_SECOND * 2),
+    )
+    print("Spinning, press Ctrl+C to stop")
+    try:
+        with motor.enabled():
+            while True:
+                motor.move_by(STEPS_PER_SECOND)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        motor.close()
 
-while True:
-    step.on()
-    sleep(delay)
-    step.off()
-    sleep(delay)
+
+if __name__ == "__main__":
+    main()

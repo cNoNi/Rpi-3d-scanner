@@ -1,81 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>3D Scanner Control</title>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>3D Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
+<main class="container">
+    <header>
+        <h1>3D Scanner</h1>
+        <span id="connection" class="badge badge-off">Connecting…</span>
+    </header>
 
-<div class="container">
+    <section class="card">
+        <h2>Scan</h2>
+        <div class="progress"><div id="progress-bar"></div></div>
+        <p id="progress-text">0 / 0</p>
+        <div class="row">
+            <button id="scan-start" class="primary">Start scan</button>
+            <button id="scan-stop" class="danger">Stop</button>
+        </div>
+    </section>
 
-    <h1>3D Scanner</h1>
+    <section class="card">
+        <h2>Manual control</h2>
+        <div class="row">
+            <button id="motor-ccw" title="Rotate counter-clockwise">⟲ CCW</button>
+            <button id="photo">Take photo</button>
+            <button id="motor-cw" title="Rotate clockwise">CW ⟳</button>
+        </div>
+    </section>
 
-    <button onclick="startScan()">Start Scan</button>
-    <button onclick="stopScan()">Stop Scan</button>
-
-    <hr>
-
-    <button onclick="takePhoto()">Take Photo</button>
-    <button onclick="moveCW()">Rotate CW</button>
-    <button onclick="moveCCW()">Rotate CCW</button>
-
-    <div id="status">
-        Connecting...
-    </div>
-
-</div>
-
-<script>
-
-function request(url, method = "POST") {
-    fetch(url, { method })
-        .catch(console.error);
-}
-
-function startScan() {
-    request("/scan/start");
-}
-
-function stopScan() {
-    request("/scan/stop");
-}
-
-function takePhoto() {
-    request("/camera/photo");
-}
-
-function moveCW() {
-    request("/motor/cw");
-}
-
-function moveCCW() {
-    request("/motor/ccw");
-}
-
-
-const events = new EventSource("/events");
-
-events.onopen = () => {
-    console.log("SSE connected");
-};
-
-events.onmessage = (event) => {
-
-    const data = JSON.parse(event.data);
-
-    document.getElementById("status").innerHTML = `
-        Running: ${data.running}<br>
-        Photo: ${data.photo}/${data.total}
-    `;
-};
-
-events.onerror = () => {
-    document.getElementById("status").innerHTML =
-        "Disconnected from server...";
-};
-
-</script>
-
+    <section class="card">
+        <h2>Status</h2>
+        <dl>
+            <dt>Phone</dt><dd id="phone">–</dd>
+            <dt>State</dt><dd id="state">–</dd>
+        </dl>
+        <p id="message" class="message" hidden></p>
+    </section>
+</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

@@ -1,68 +1,100 @@
-import os
+"""Phone used as a remote camera over a WebSocket.
+
+Protocol: the server sends ``take_photo``, the phone answers ``photo_taken``
+once the picture is saved on the phone.
+"""
+
 import asyncio
+import logging
+import threading
 
-from threading import Event
-
-
-class Camera:
-
-    def __init__(self,image_dir):
-        self.image_dir = image_dir
-
-        os.makedirs(
-            self.image_dir,
-            exist_ok=True
-        )
-
-        self.phone = None
-        self.loop = None
-
-        self.photo_done = Event()
-
-    def set_connection(self,websocket,loop):
-        self.phone = websocket
-        self.loop = loop
-
-        print("Camera: telefon podłączony")
-
-    def disconnect(self, websocket):
-        # rozłącz tylko, jeśli to aktualne połączenie
-        if self.phone is websocket:
-            self.phone = None
-            self.loop = None
-            self.photo_done.clear()
-            print("Camera: telefon rozłączony")
+log = logging.getLogger(__name__)
 
 
-    async def _send_take_photo(self):
-        if self.phone:
-            await self.phone.send(
-                "take_photo"
-            )
+class CameraError(RuntimeError):
+    pass
 
 
+class PhoneCamera:
+    def __init__(self, send_timeout=5.0, confirm_timeout=10.0, on_change=None):
+        self.send_timeout = send_timeout
+        self.confirm_timeout = confirm_timeout
+        self.on_change = on_change
 
-    def take_photo(self, filename):
-        phone, loop = self.phone, self.loop
+        self._state_lock = threading.Lock()
+        self._capture_lock = threading.Lock()
+        self._websocket = None
+        self._loop = None
 
-        if phone is None or loop is None:
-            raise RuntimeError("Telefon nie jest podłączony")
+        self._confirmed = threading.Event()
+        self._pending = False
 
-        self.photo_done.clear()
+    @property
+    def connected(self):
+        return self._websocket is not None
 
-        future = asyncio.run_coroutine_threadsafe(
-            phone.send("take_photo"),
-            loop,
-        )
-        future.result(timeout=5)  # rzuci wyjątek, jeśli wysyłka się nie udała
+    def attach(self, websocket, loop):
+        """Register a new phone connection. Returns the replaced one, if any."""
+        with self._state_lock:
+            previous = self._websocket
+            self._websocket = websocket
+            self._loop = loop
+        log.info("Phone connected")
+        self._notify()
+        return previous
 
-        if not self.photo_done.wait(timeout=10):
-            raise TimeoutError("Telefon nie potwierdził zdjęcia")
+    def detach(self, websocket):
+        """Forget the connection, but only if it is still the active one."""
+        with self._state_lock:
+            if self._websocket is not websocket:
+                return
+            self._websocket = None
+            self._loop = None
+        log.info("Phone disconnected")
+        self._notify()
 
-        return os.path.join(self.image_dir, filename)
+    def confirm(self):
+        """Called when the phone reports ``photo_taken``."""
+        with self._state_lock:
+            if not self._pending:
+                log.warning("Ignoring unexpected photo confirmation")
+                return
+            self._pending = False
+        self._confirmed.set()
 
+    def take_photo(self, name="photo"):
+        """Trigger the phone shutter and block until it confirms."""
+        if not self._capture_lock.acquire(blocking=False):
+            raise CameraError("Camera is busy")
+        try:
+            with self._state_lock:
+                websocket, loop = self._websocket, self._loop
+                if websocket is None or loop is None:
+                    raise CameraError("Phone is not connected")
+                self._confirmed.clear()
+                self._pending = True
 
+            try:
+                future = asyncio.run_coroutine_threadsafe(websocket.send("take_photo"), loop)
+                try:
+                    future.result(timeout=self.send_timeout)
+                except Exception as exc:
+                    future.cancel()
+                    raise CameraError(f"Could not send command to phone: {exc}") from exc
 
-    def photo_taken(self):
+                if not self._confirmed.wait(self.confirm_timeout):
+                    raise CameraError("Phone did not confirm the photo in time")
+            finally:
+                with self._state_lock:
+                    self._pending = False
 
-        self.photo_done.set()
+            log.info("Photo taken: %s", name)
+        finally:
+            self._capture_lock.release()
+
+    def _notify(self):
+        if self.on_change is not None:
+            try:
+                self.on_change()
+            except Exception:
+                log.exception("Camera on_change callback failed")
